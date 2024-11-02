@@ -1,0 +1,14 @@
+{
+  "name": "node",
+  "version": "1.0.0",
+  "description": "Node batch insert to Postgres",
+  "main": "benchmark.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Naveen Neti",
+  "license": "ISC",
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

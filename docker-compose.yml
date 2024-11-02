@@ -1,0 +1,18 @@
+# docker-compose.yml
+
+services:
+  db:
+    container_name: db
+    image: postgres:14  # Using a specific version
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: benchmark_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # Ensure init.sql path is correct
+      - postgres_data:/var/lib/postgresql/data  # Persistent volume
+
+volumes:
+  postgres_data:
