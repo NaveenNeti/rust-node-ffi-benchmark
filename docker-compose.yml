@@ -3,7 +3,7 @@
 services:
   db:
     container_name: db
-    image: postgres:14  # Using a specific version
+    image: postgres:14
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
@@ -11,8 +11,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./init.sql:/docker-entrypoint-initdb.d/init.sql  # Ensure init.sql path is correct
-      - postgres_data:/var/lib/postgresql/data  # Persistent volume
-
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+      - postgres_data:/var/lib/postgresql/data
 volumes:
   postgres_data:

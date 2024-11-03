@@ -1,5 +1,62 @@
-// src/main.rs
+
+use tokio::task;
 use tokio_postgres::{NoTls, Error};
+use std::sync::Arc;
+use futures::future::join_all;
+
+async fn batch_insert_async(thread_count: usize, total_count: usize) -> Result<(), Error> {
+    let (client, connection) = tokio_postgres::connect(
+        "host=localhost user=user password=password dbname=benchmark_db",
+        NoTls,
+    ).await?;
+
+    // Spawn a task to handle the connection
+    tokio::spawn(async move {
+        if let Err(e) = connection.await {
+            eprintln!("Connection error: {}", e);
+        }
+    });
+
+    let client = Arc::new(client);
+    let mut handles = Vec::new();
+
+    for i in 0..total_count {
+        let client = Arc::clone(&client);
+        let handle = task::spawn(async move {
+            let param = format!("Row {}", i + 1);
+            let query = "INSERT INTO benchmark (value) VALUES ($1)";
+            let timer = tokio::time::Instant::now();
+            client.execute(query, &[&param]).await?;
+            println!("Insert Row {}: {:?}", i + 1, timer.elapsed());
+            Ok::<(), Error>(())
+        });
+
+        handles.push(handle);
+
+        if handles.len() == thread_count {
+            // Await the current batch
+            let results = join_all(handles).await;
+            for result in results {
+                if let Err(e) = result {
+                    eprintln!("Task error: {}", e);
+                }
+            }
+            handles = Vec::new();
+        }
+    }
+
+    // Await any remaining tasks
+    if !handles.is_empty() {
+        let results = join_all(handles).await;
+        for result in results {
+            if let Err(e) = result {
+                eprintln!("Task error: {}", e);
+            }
+        }
+    }
+
+    Ok(())
+}
 
 async fn batch_insert(batch_size: usize, total_count: usize) -> Result<(), Error> {
     let (client, connection) =
@@ -28,32 +85,9 @@ async fn batch_insert(batch_size: usize, total_count: usize) -> Result<(), Error
     Ok(())
 }
 
-async fn clear_records() -> Result<(), Error> {
-    let (client, connection) =
-        tokio_postgres::connect("host=localhost user=user password=password dbname=benchmark_db", NoTls).await?;
-
-    tokio::spawn(async move {
-        if let Err(e) = connection.await {
-            eprintln!("Connection error: {}", e);
-        }
-    });
-
-    client.execute("DELETE FROM benchmark", &[]).await?;
-    Ok(())
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Error> {
-    batch_insert(100, 6000000).await?;
+    batch_insert_async(10, 200000).await?;
     println!("Batch insert complete");
     Ok(())
 }
-
-// ./target/debug/rust  10.78s user 3.60s system 40% cpu 35.311 total
-// node node/benchmark.js  3.24s user 1.66s system 21% cpu 23.083 total
-
-// ./rust  2.33s user 3.59s system 19% cpu 29.791 total
-// ./rust  2.32s user 3.67s system 20% cpu 29.233 total
-
-// node benchmark.js  3.08s user 1.61s system 19% cpu 23.480 total
-// node benchmark.js  3.11s user 1.56s system 19% cpu 23.511 total
